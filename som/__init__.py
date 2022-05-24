@@ -30,7 +30,8 @@ class SOM(object):
     """
     Class implementing a self-organizing map with periodic boundary conditions. It has the following methods:
     """
-    def __init__(self, x, y, alpha_start=0.6, sigma_start=None, seed=None):
+    def __init__(self, x, y, alpha_start=0.6, sigma_start=None, seed=None,
+                 bmu_metric='euclidean', init='pca'):
         """ Initialize the SOM object with a given map size
 
         :param x: {int} width of the map
@@ -60,6 +61,8 @@ class SOM(object):
         self.inizialized = False
         self.error = 0.  # reconstruction error
         self.history = []  # reconstruction error training history
+        self.bmu_metric = bmu_metric
+        self.init = init
 
     def initialize(self, data, how='pca'):
         """ Initialize the SOM neurons
@@ -69,8 +72,9 @@ class SOM(object):
             values normally distributed in the shape of `data`)
         :return: initialized map in self.map
         """
-        self.map = np.random.normal(np.mean(data), np.std(data), size=(self.x, self.y, len(data[0])))
-        if how == 'pca':
+        if how =='random':
+            self.map = np.random.normal(np.mean(data), np.std(data), size=(self.x, self.y, len(data[0])))
+        elif how == 'pca':
             eivalues = PCA(4).fit_transform(data.T).T
             for i in range(4):
                 self.map[np.random.randint(0, self.x), np.random.randint(0, self.y)] = eivalues[i]
@@ -83,7 +87,11 @@ class SOM(object):
         :param vector: {numpy.ndarray} vector of current data point(s)
         :return: indices of winning neuron
         """
-        indx = np.argmin(np.sum((self.map - vector) ** 2, axis=2))
+        indx = 0
+        if self.bmu_metric == 'euclidean':
+            indx = np.argmin(np.sum((self.map - vector) ** 2, axis=2))
+        elif self.bmu_metric == 'dot_product':
+            indx = np.argmax(np.dot(self.map, vector))
         return np.array([indx // self.y, indx % self.y])
 
     def cycle(self, vector, verbose=True):
@@ -118,7 +126,7 @@ class SOM(object):
         """
         self.interval = interval
         if not self.inizialized:
-            self.initialize(data)
+            self.initialize(data, how=self.init)
         if not epochs:
             epochs = len(data)
             indx = np.random.choice(np.arange(len(data)), epochs, replace=False)
